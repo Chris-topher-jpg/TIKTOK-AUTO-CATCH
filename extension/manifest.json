@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "主播数据桥 · ERP",
+  "version": "0.1.8",
+  "description": "按日期范围采集直播服务平台主播 ID、抖音号、昵称、粉丝、每日音浪、开播时长和 ACU，支持预览与导出。",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://union.bytedance.com/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "打开主播数据桥" },
+  "content_scripts": [{
+    "matches": ["https://union.bytedance.com/open/portal/*"],
+    "js": ["core.js", "collector.js"],
+    "run_at": "document_idle"
+  }]
+}

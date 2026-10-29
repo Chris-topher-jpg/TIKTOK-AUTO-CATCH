@@ -1,0 +1,6 @@
+.badge.running,.badge.completed{background:#eaf5ef;color:#287558}
+.badge.paused{background:#f1f3ef;color:#6d786f}
+.badge.error{background:#fff0ed;color:#b24e42}
+.notice.info{background:#edf5f1;border-color:#d8e9df;color:#3c6d59}
+.notice.error{background:#fff0ed;border-color:#f2d4ce;color:#a04438}
+.notice.success{background:#edf7ef;border-color:#d7eadb;color:#3b7650}

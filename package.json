@@ -1,0 +1,27 @@
+{
+  "name": "tiktok-auto-catch",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "独立后台主播采集、持久队列、ERP 导出与授权增量同步",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check.mjs",
+    "preview": "node scripts/preview.mjs",
+    "preview:serve": "node scripts/serve-preview.mjs",
+    "pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack.ps1",
+    "service:open": "node service/launch.mjs",
+    "service:login": "node service/main.mjs --login",
+    "service:start": "node service/main.mjs",
+    "service:once": "node service/main.mjs --once",
+    "service:export": "node service/main.mjs --export",
+    "service:verify": "node scripts/verify-service-browser.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

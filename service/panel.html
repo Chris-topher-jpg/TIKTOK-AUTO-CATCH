@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="tac-action" content="__ACTION_KEY__">
+<title>主播自动同步</title><link rel="stylesheet" href="/panel.css">
+<body><main>
+  <header><span class="brand">主播数据桥</span><span class="tag">每 10 分钟自动读取</span></header>
+  <section class="hero"><span class="eyebrow">自动采集 · 自动同步</span><h1 id="headline">正在读取状态…</h1><p id="summary">打开后自动运行，关闭此页面也会继续。</p><p class="warning" id="issue" role="status" hidden></p></section>
+  <div class="stats"><article><span>已识别主播</span><strong id="profiles">—</strong></article><article><span>每日记录</span><strong id="records">—</strong></article><article><span>已匹配待发送</span><strong id="queued">—</strong></article><article><span>最后同步</span><strong class="time" id="delivered">暂无</strong></article></div>
+  <p id="queue-note" role="status"></p>
+  <details class="scan-details" id="scan-details" hidden><summary id="scan-summary">本轮平台扫描</summary><p id="scan-note"></p></details>
+  <section class="collection-card" aria-labelledby="collection-title">
+    <div class="collection-heading"><div><h2 id="collection-title">采集日期</h2><p id="collection-current">正在读取日期设置…</p></div><a href="https://union.bytedance.com/open/portal/data/data?appId=3000" target="_blank" rel="noreferrer">查看平台数据中心 ↗</a></div>
+    <form id="collection-form">
+      <div class="date-fields"><label for="collection-start">开始日期<input id="collection-start" type="date" required></label><span class="date-arrow" aria-hidden="true">→</span><label for="collection-end">结束日期<input id="collection-end" type="date" required></label></div>
+      <div class="collection-presets"><button type="button" class="quiet" id="date-today">今日</button><button type="button" class="quiet" id="date-yesterday">昨日</button><button type="button" class="quiet" id="date-week">近7天</button><span>同一天为单日 · 区间包含首尾 · 最多31天</span></div>
+      <div class="collection-actions"><button id="collect-range" type="submit">按所选日期采集</button><button id="collection-auto" class="quiet" type="button">恢复自动日期</button></div>
+    </form>
+    <p id="collection-message" role="status" aria-live="polite"></p><p id="collection-progress" role="status" aria-live="polite"></p>
+    <div class="collection-data"><strong id="collection-data-count">等待数据</strong><p id="collection-quality"></p><small>从数据中心读取总音浪、开播总时长和独立 ACU，每位主播每天保存一条。今天为暂估；缺失值保留为空。</small><nav><a id="range-csv" href="/exports/daily.csv">导出当前区间 CSV</a><a id="range-json" href="/exports/daily.json">导出当前区间核对记录</a></nav></div>
+  </section>
+  <section class="connections">
+    <article><div class="step">01</div><h2>抖音平台</h2><p id="platform-status">已有登录会自动恢复；需要时在弹出的浏览器中登录。</p><button id="platform-login" type="button">登录平台</button><small>只需登录一次，过期后在此重新登录。</small></article>
+    <article><div class="step">02</div><h2>连接 ERP</h2><p id="erp-status">首次连接后，以后打开就会自动同步。</p>
+      <form id="connect-form"><label for="phone">ERP 手机号</label><input id="phone" name="username" type="tel" autocomplete="username" inputmode="numeric" maxlength="11" required placeholder="总经理或运营负责人账号">
+      <label for="password">ERP 密码</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="512" required placeholder="密码不会保存在采集服务">
+      <small>自动识别主播 ID、抖音号并匹配 ERP，无需填写公会名称。</small>
+      <small>主播 ID、抖音号对应同一档案即可同步，昵称或游戏后缀不同不影响记录。</small>
+      <button id="connect" type="submit">连接并开启自动同步</button></form><button id="reconnect" type="button" hidden>重新授权</button>
+      <p id="connect-message" role="status"></p>
+    </article>
+  </section>
+  <details class="scan-details" id="error-details" hidden><summary>查看上次中断位置</summary><pre id="error-note"></pre></details>
+  <footer><p id="timing">首次读取可能需要几分钟。</p><p>每10分钟优先读取当天累计数据，历史日汇总每6小时复核。ERP主播档案显示全部七项指标、数据日期及同步时间；当天快照单独存储，不计入正式结算。</p><nav><a href="/exports/daily.csv">下载每日明细</a><a href="/exports/profiles.csv">下载主播档案</a><a href="/exports/daily.json">下载核对记录</a><a id="unmatched-export" href="/exports/unmatched.json" hidden>下载待核对名单</a><a href="https://erp.yeshuyu.com" target="_blank" rel="noreferrer">打开 ERP</a></nav><small>电脑须保持开机、联网。未匹配主播和待核对数据保留在本机。</small><button class="quiet" id="stop" type="button">停止服务</button></footer>
+</main><script src="/panel.js"></script></body></html>

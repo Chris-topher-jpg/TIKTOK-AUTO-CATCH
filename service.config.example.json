@@ -1,0 +1,8 @@
+{
+  "intervalSeconds": 600,
+  "lookbackDays": 2,
+  "includeToday": true,
+  "channel": "msedge",
+  "port": 17865,
+  "dataDir": "localdata"
+}

@@ -1,0 +1,80 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright-core';
+import { once } from 'node:events';
+import { mkdtemp, rm, readFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Store, PROTOCOL } from '../service/store.mjs';
+import { Runtime } from '../service/runtime.mjs';
+import { createControlServer } from '../service/control.mjs';
+const directory = await mkdtemp(join(tmpdir(), 'tac-autosync-ui-')), store = new Store(join(directory, 'collector.sqlite'));
+const profile = { anchorId: '7601032374063105082', douyinId: 'ui-test-only', nickname: '离线验收数据' };
+const unknown = { ...profile, anchorId: '7601032374063105083', douyinId: 'unmatched-ui-only' };
+store.saveProfiles([profile, unknown]); store.completeProfiles([profile, unknown], { scanned: 3, total: 3, identified: 2, unidentified: 1,
+  unidentifiedSample: [{ platformRow: 2, row: 2, nickname: '账号已注销', reason: '账号已注销，平台未提供 UID' }] });
+store.save([profile, unknown].map(value => ({ ...value, date: new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' }), followers: 100, waves: 100, liveSeconds: 300, acu: 10 })));
+let logins = 0, bindings = 0, received = 0, platformLogins = 0;
+const fetcher = async (url, options) => {
+  const path = new URL(url).pathname; let body = {};
+  if (path === '/api/login') { logins++; body = { user: { level: 'generalManager' } }; }
+  else if (path === '/api/bootstrap') body = { anchors: [{ id: 'ui-test-anchor', unionAnchorId: profile.anchorId, douyinId: profile.douyinId, platformGuild: '', dept: '运营' }] };
+  else if (path.endsWith('/tokens')) body = { id: 'ui-token-only', token: 'tac_' + 't'.repeat(43), expiresAt: '2027-01-01T00:00:00Z' };
+  else if (path.endsWith('/bindings')) bindings++;
+  else if (path === '/api/integrations/douyin-anchor-daily') { const rows = JSON.parse(options.body).records; received += rows.length; body = { protocol: PROTOCOL, accepted: rows.length, unmatched: [] }; }
+  return new Response(JSON.stringify(body), { headers: path === '/api/login' ? { 'Set-Cookie': 'yes_session=ui-only; HttpOnly' } : {} });
+};
+const source = { async open({ login } = {}) { if (login) platformLogins++; }, async close() {}, async isLoggedIn() { return false; } };
+const runtime = new Runtime({ store, source, config: { intervalSeconds: 600, lookbackDays: 2 }, dataDir: directory, fetcher });
+const server = createControlServer(runtime, { port: 0 }); server.listen(0, '127.0.0.1'); await once(server, 'listening');
+let browser;
+try {
+  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const page = await browser.newPage({ viewport: { width: 1320, height: 1020 } }), errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  await page.goto(base);
+  await page.getByRole('heading', { name: '连接 ERP，开启自动同步' }).waitFor();
+  assert.equal(await page.locator('#agency').count(), 0);
+  await page.getByText('自动识别主播 ID、抖音号并匹配 ERP，无需填写公会名称。', { exact: true }).waitFor();
+  await page.getByLabel('ERP 手机号').fill('13800000000');
+  await page.getByLabel('ERP 密码').fill('private-ui-test-only');
+  await page.getByRole('button', { name: '连接并开启自动同步' }).click();
+  await page.getByRole('heading', { name: '自动同步已开启' }).waitFor();
+  assert.equal(await page.locator('#profiles').textContent(), '2');
+  assert.equal(await page.locator('#scan-summary').textContent(), '最近一次完整扫描');
+  assert.match(await page.locator('#scan-note').textContent(), /平台列表 3\/3 条，已识别 2 位，无法识别 1 条/);
+  assert.match(await page.locator('#scan-note').textContent(), /平台第 2 条：账号已注销（账号已注销，平台未提供 UID）/);
+  assert.equal(await page.getByLabel('ERP 密码').inputValue(), '');
+  assert.equal(logins, 1); assert.equal(bindings, 1); assert.equal(received, 1); assert.equal(store.status().queued, 1);
+  assert.equal(await page.locator('#queued').textContent(), '0');
+  assert.match(await page.locator('#queue-note').textContent(), /已匹配待发送 0 条，未匹配保留 1 条/);
+  await page.getByRole('link', { name: '下载待核对名单' }).waitFor();
+  const unmatchedResponse = await fetch(base + '/exports/unmatched.json');
+  assert.equal(unmatchedResponse.status, 200);
+  assert.equal((await unmatchedResponse.json())[0].anchorId, unknown.anchorId);
+  assert.equal(await page.getByRole('button', { name: '重新授权' }).isVisible(), true);
+  const status = await (await fetch(base + '/status')).json();
+  assert.ok(!JSON.stringify(status).includes('tac_')); assert.equal(status.lastDelivery.count, 1);
+  const savedText = await readFile(join(directory, 'erp-sync.json'), 'utf8'); assert.ok(!savedText.includes('private-ui-test-only'));
+  await mkdir(new URL('../artifacts/', import.meta.url), { recursive: true });
+  await page.screenshot({ path: fileURLToPath(new URL('../artifacts/autosync-ui-offline-test.png', import.meta.url)), fullPage: true });
+  await page.reload(); await page.getByRole('heading', { name: '自动同步已开启' }).waitFor(); assert.equal(logins, 1);
+  runtime.lastError = '今天数据暂时无法读取：离线超时夹具';
+  await page.getByRole('heading', { name: '采集需要处理' }).waitFor();
+  assert.match(await page.locator('#issue').textContent(), /离线超时夹具/);
+  runtime.lastError = null;
+  await page.getByRole('heading', { name: '自动同步已开启' }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.getByRole('button', { name: '登录平台' }).click();
+  await page.getByRole('heading', { name: '请在浏览器中登录抖音平台' }).waitFor(); assert.equal(platformLogins, 1);
+  assert.deepEqual(errors, []);
+  const restored = new Runtime({ store, source, config: { intervalSeconds: 600 }, dataDir: directory, fetcher, saved: JSON.parse(savedText) });
+  assert.equal(restored.status().sync.enabled, true); assert.equal(restored.status().sync.stage, 'connected');
+  await restored.close();
+  console.log('PASS real Edge: no guild input, blank ERP guild → exact identity binding → auto delivery → receipt; reload and restart retain authorization; platform login, password clearing, mobile layout and zero page errors. Temporary fixture data and mocked ERP only, no production requests.');
+} finally {
+  await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await runtime.close(); store.close();
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+}
