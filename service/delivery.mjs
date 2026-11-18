@@ -32,6 +32,11 @@ export async function deliverOnce(store, { endpoint, token, approved = false, an
 async function deliverBatch(store, batch, { endpoint, token, fetcher }) {
   if (typeof token !== 'string' || token.length < 24) throw new Error('请在环境变量中配置专用 ERP 集成令牌');
   if (!batch.length) return { status: 'idle' };
+  // Resuming after weeks offline can mix old backlog and new reports. ERP
+  // accepts at most 31 inclusive days per batch; leave later dates queued.
+  const dates = batch.map(row => Date.parse(JSON.parse(row.body).date));
+  const latestDay = Math.min(...dates) + 30 * 86400000;
+  batch = batch.filter((_row, index) => dates[index] <= latestDay);
   const key = batchKey(batch);
   const protocol = JSON.parse(batch[0].body).provisional ? SNAPSHOT_PROTOCOL : PROTOCOL;
   try {

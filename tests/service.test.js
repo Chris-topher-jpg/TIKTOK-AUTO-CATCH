@@ -156,6 +156,27 @@ test('delivery caps batches at fifty and requires full acknowledgement', async (
   } finally { store.close(); }
 });
 
+test('resumed backlog spans multiple months without blocking either legacy or scoped delivery', async () => {
+  for (const scoped of [false, true]) {
+    const store = new Store(':memory:'), sent = [];
+    try {
+      store.save(['2026-10-31', '2026-09-01', '2026-10-01', '2026-10-02'].map(date => ({ ...record, date })));
+      const options = { ...delivery, ...(scoped ? { targets: [{ token: delivery.token, anchorIds: [record.anchorId] }] } : {}),
+        fetcher: async (_url, options) => {
+          const body = JSON.parse(options.body);
+          sent.push(body.records.map(row => row.date));
+          return { ok: true, json: async () => ({ protocol: PROTOCOL, accepted: body.records.length, unmatched: [] }) };
+        } };
+      assert.equal((await deliverOnce(store, options)).count, 2);
+      assert.equal(store.status().queued, 2);
+      assert.equal((await deliverOnce(store, options)).count, 2);
+      assert.deepEqual(sent, [['2026-09-01', '2026-10-01'], ['2026-10-31', '2026-10-02']]);
+      assert.equal(store.status().queued, 0);
+      assert.equal(store.records().length, 4);
+    } finally { store.close(); }
+  }
+});
+
 test('unsupported same-day data is explicit while completed historical rows remain', async () => {
   const store = new Store(':memory:'); const called = [];
   const source = { async collect(kind, date, callback) {
